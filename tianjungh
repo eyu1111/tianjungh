@@ -1,0 +1,125 @@
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0.1, 0, 0.05, 0)
+ToggleButton.Position = UDim2.new(0.85, 0, 0.1, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+ToggleButton.Text = "开始自动工作"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Parent = ScreenGui
+
+
+local position1 = CFrame.new(-26434.595703125, 19.137731552124023, -1246.9326171875)
+local position2 = CFrame.new(-26874.970703125, 19.637731552124023, -751.6705322265625)
+
+local isRunning = false
+local currentPosition = 1
+local isInteracting = false
+local canInteract = true
+local secondPromptCompleted = false 
+
+
+local function checkPromptType(prompt)
+    if prompt.ActionText == "Teleport to obby 11" and prompt.ObjectText == "Obby 11" then
+        return 1
+    elseif prompt.ActionText == "Claim 20000$" and prompt.ObjectText == "Finish the obby" then
+        return 2
+    end
+    return 0
+end
+
+
+local function handlePrompt(prompt)
+    if prompt and prompt.Enabled and not isInteracting and canInteract then
+        local promptType = checkPromptType(prompt)
+        
+        
+        if (currentPosition == 1 and promptType == 1) or (currentPosition == 2 and promptType == 2) then
+            isInteracting = true
+            
+            
+            fireproximityprompt(prompt)
+            
+            
+            prompt.Triggered:Once(function()
+                if promptType == 1 then
+                    
+                    task.wait(0.5)
+                    currentPosition = 2
+                    canInteract = false
+                    secondPromptCompleted = false 
+                    
+                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = position2
+                        task.delay(7, function()
+                            canInteract = true
+                        end)
+                    end
+                else
+                    
+                    secondPromptCompleted = true
+                    task.wait(1)
+                    
+                    
+                    if secondPromptCompleted then
+                        currentPosition = 1
+                        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                            LocalPlayer.Character.HumanoidRootPart.CFrame = position1
+                        end
+                    end
+                end
+                
+                task.wait(0.5)
+                isInteracting = false
+            end)
+            
+            
+            task.delay(3, function()
+                if isInteracting then
+                    isInteracting = false
+                end
+            end)
+        end
+    end
+end
+
+
+local function mainLoop()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = position1
+    end
+    
+    RunService.RenderStepped:Connect(function()
+        if not isRunning then return end
+        
+        for _, prompt in pairs(workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") and prompt.Enabled then
+                handlePrompt(prompt)
+            end
+        end
+    end)
+end
+
+
+ToggleButton.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    currentPosition = 1
+    isInteracting = false
+    canInteract = true
+    secondPromptCompleted = false
+    
+    if isRunning then
+        ToggleButton.Text = "停止自动工作"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        task.spawn(mainLoop)
+    else
+        ToggleButton.Text = "开始自动工作"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    end
+end)
