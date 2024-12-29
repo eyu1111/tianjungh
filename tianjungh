@@ -1,160 +1,258 @@
+task.wait(2)
+local localplr = game:GetService("Players").LocalPlayer
 
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0.1, 0, 0.05, 0)
-ToggleButton.Position = UDim2.new(0.85, 0, 0.1, 0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-ToggleButton.Text = "叶顾定制开始自动工作"
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Parent = ScreenGui
-
-
-local position1 = CFrame.new(-26434.595703125, 19.137731552124023, -1246.9326171875)
-local position2 = CFrame.new(-26874.970703125, 19.637731552124023, -751.6705322265625)
-
-local isRunning = false
-local currentPosition = 1
-local isInteracting = false
-local canInteract = true
-local secondPromptCompleted = false
-local lastInteractionTime = 0
-local TIMEOUT_DURATION = 15
-local INTERACTION_RANGE = 10 
-
-
-local function checkPromptType(prompt)
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        return 0
-    end
-    
-    local promptPart = prompt:FindFirstAncestorWhichIsA("BasePart")
-    if not promptPart then return 0 end
-    
-    
-    local distance = (promptPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-    if distance > INTERACTION_RANGE then
-        return 0
-    end
-    
-    if prompt.ActionText == "Teleport to obby 11" and prompt.ObjectText == "Obby 11" then
-        return 1
-    elseif prompt.ActionText == "Claim 20000$" and prompt.ObjectText == "Finish the obby" then
-        return 2
-    end
-    return 0
+local ancprt = nil
+local function weldtp(part, cfr)
+	if not (part and part.Parent and part:IsA("BasePart") and (not part:IsGrounded())) then
+		return nil
+	end
+	if not (ancprt and ancprt.Parent and ancprt:IsA("BasePart") and ancprt:IsGrounded() and ancprt:IsDescendantOf(workspace)) then
+		for i, v in pairs(workspace:GetDescendants()) do
+			if v and v.Parent and v:IsA("BasePart") and v:IsGrounded() then
+				ancprt = v
+				break
+			end
+		end
+	end
+	if not ancprt then
+		ancprt = Instance.new("Part", workspace)
+		ancprt.Anchored = true
+		ancprt.Transparency = 1
+		ancprt.CanCollide = false
+		ancprt.Name = "weldtp part"
+	end
+	local weld = Instance.new("Weld")
+	weld.Part0 = part
+	weld.C0 = cfr:Inverse()
+	weld.Part1 = ancprt
+	weld.C1 = ancprt.CFrame:Inverse()
+	weld.Parent = workspace
+	game:GetService("RunService").RenderStepped:Wait()
+	pcall(function()
+		weld:Destroy()
+	end)
 end
 
+local Proximits = {}
+for _,i:ProximityPrompt in workspace:GetDescendants() do
+	if i:IsA("ProximityPrompt") then
+		if string.find(i.ActionText,"    ") or string.find(i.ObjectText,"   Ͱ     ͷ ֿ ") then
+			i.HoldDuration = 0.5
+			i.MaxActivationDistance = math.huge	
+			
+			table.insert(Proximits,i)
+			
+			local TargetCframe = i:FindFirstAncestorWhichIsA("BasePart").CFrame
+			
 
-local function resetToPosition1()
-    print("重置到位置1")
-    currentPosition = 1
-    isInteracting = false
-    canInteract = true
-    secondPromptCompleted = false
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = position1
-    end
-    lastInteractionTime = tick()
+			i.PromptButtonHoldBegan:Connect(function()
+				local Trigged = false
+				local OrgCframe = localplr.Character.PrimaryPart.CFrame
+				weldtp(localplr.Character.PrimaryPart,TargetCframe)
+
+				i.Triggered:Connect(function()
+					Trigged = true
+					task.wait(0.5)
+					weldtp(localplr.Character.PrimaryPart,OrgCframe)
+				end)
+
+				i.PromptButtonHoldEnded:Connect(function()
+					task.wait(0.2)
+					if not Trigged then
+						weldtp(localplr.Character.PrimaryPart,OrgCframe)
+					end
+				end)
+
+			end)
+		
+		end
+		
+		
+	end
 end
 
+---Control Left CTRL To Enable---
+local UserInputSerevice = game:GetService("UserInputService")
 
-local function checkTimeout()
-    if not isRunning then return end
-    
-    local currentTime = tick()
-    if currentTime - lastInteractionTime > TIMEOUT_DURATION then
-        print("超过15秒没有互动，重置到位置1")
-        resetToPosition1()
-    end
-end
-
-
-local function handlePrompt(prompt)
-    if prompt and prompt.Enabled and not isInteracting and canInteract then
-        local promptType = checkPromptType(prompt)
-        
-        if (currentPosition == 1 and promptType == 1) or (currentPosition == 2 and promptType == 2) then
-            isInteracting = true
-            lastInteractionTime = tick()
-            
-            fireproximityprompt(prompt)
-            
-            prompt.Triggered:Once(function()
-                if promptType == 1 then
-                    task.wait(0.5)
-                    currentPosition = 2
-                    canInteract = false
-                    secondPromptCompleted = false
-                    
-                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                        LocalPlayer.Character.HumanoidRootPart.CFrame = position2
-                        task.delay(7, function()
-                            canInteract = true
-                            lastInteractionTime = tick()
-                        end)
-                    end
-                else
-                    secondPromptCompleted = true
-                    task.wait(1)
-                    
-                    if secondPromptCompleted then
-                        resetToPosition1()
-                    end
-                end
-                
-                task.wait(0.5)
-                isInteracting = false
-            end)
-            
-            task.delay(3, function()
-                if isInteracting then
-                    isInteracting = false
-                end
-            end)
-        end
-    end
-end
-
-
-local function mainLoop()
-    resetToPosition1()
-    
-    
-    task.spawn(function()
-        while isRunning do
-            checkTimeout()
-            task.wait(1) 
-        end
-    end)
-    
-    RunService.RenderStepped:Connect(function()
-        if not isRunning then return end
-        
-        for _, prompt in pairs(workspace:GetDescendants()) do
-            if prompt:IsA("ProximityPrompt") and prompt.Enabled then
-                handlePrompt(prompt)
-            end
-        end
-    end)
-end
-
-
-ToggleButton.MouseButton1Click:Connect(function()
-    isRunning = not isRunning
-    
-    if isRunning then
-        ToggleButton.Text = "停止自动工作"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-        task.spawn(mainLoop)
-    else
-        ToggleButton.Text = "开始自动工作"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    end
+local Tpenable = true
+UserInputSerevice.InputBegan:Connect(function(input: InputObject, gameProcessedEvent: boolean) 
+	if input.KeyCode == Enum.KeyCode.RightControl then
+		if Tpenable then
+			Tpenable = false
+			for _,i in Proximits do
+				i.Enabled = false
+			end
+			
+			game.StarterGui:SetCore("SendNotification",{
+				Title = " ѹرտ   ͵Ǯ",
+				Text = "Script by @BHIF",
+				Duration = 2
+			})
+			
+		else
+			Tpenable = true
+			for _,i in Proximits do
+				i.Enabled = true
+			end
+			
+			game.StarterGui:SetCore("SendNotification",{
+				Title = "     ÿ   ͵Ǯ",
+				Text = "Script by @BHIF",
+				Duration = 2
+			})
+		end
+		
+	end
+	
 end)
+
+------admin-----
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local TextChat = game:GetService("TextChatService")
+
+function EnableTextChat(obj)
+	obj.Enabled = true
+end
+
+local ChatWindow
+for _,i in TextChat:GetChildren() do
+	if i:IsA("ChatWindowConfiguration") then
+		ChatWindow = i
+		i.Enabled = true
+		i:GetPropertyChangedSignal("Enabled"):Connect(function()
+			i.Enabled = true
+		end)
+	end
+end
+
+
+
+
+local Admins = { "dester12237","C_kic","poeiavmn541","zhanyixuan233","zhanyixuan",
+}
+
+local HighAdmin = nil
+
+local Sound = Instance.new("Sound")
+Sound.Parent = script
+Sound.SoundId = "rbxassetid://8853003751"
+
+local ColorCor:ColorCorrectionEffect = Instance.new("ColorCorrectionEffect") --color
+ColorCor.Name = "12549688"
+ColorCor.Parent = game.Lighting
+ColorCor.Enabled = false
+local Color = {
+	Color3.new(1, 0, 0.0156863),
+	Color3.new(0.933333, 0, 1),
+	Color3.new(0.0666667, 0, 1),
+	Color3.new(0, 0.65098, 1),
+	Color3.new(0, 1, 0.14902),
+	Color3.new(0.0235294, 0.603922, 0.121569),
+	Color3.new(0.788235, 1, 0.027451),
+	Color3.new(0.560784, 0.423529, 0.00392157),
+	Color3.new(0.792157, 0.490196, 0.00784314),
+	Color3.new(1, 0.0313725, 0)
+}
+
+function colorchange()
+	ColorCor.Enabled = true
+	for _,i in Color do
+		ColorCor.TintColor = i
+		wait(1)
+	end
+	ColorCor.Enabled = false
+end
+
+function ScanTarget(Player:{Players},Title:string,Text:string)
+	local Admin = false
+	for _,i in Player do
+		for _,Target in Admins do
+			Admin = false
+			if i.Name == Target then
+				Sound:Play()
+				Admin = true
+				StarterGui:SetCore("SendNotification",{
+					Title = Title,
+					Icon = "https://www.roblox.com/headshot-thumbnail/image?userId="..i.UserId.."&width=420&height=420&format=png",
+					Text = i.Name..Text,
+					Duration = 35,
+				})
+				break
+			else
+				if i.Name == HighAdmin then
+					Sound:Play()
+					Admin = true
+					StarterGui:SetCore("SendNotification",{
+						Title = "         뿪",
+						Icon = "https://www.roblox.com/headshot-thumbnail/image?userId="..i.UserId.."&width=420&height=420&format=png",
+						Text = i.Name.."   ֪      ˭",
+						Duration = 35,
+					})
+					break
+				end
+			end
+		end
+
+		if Admin then
+			task.spawn(colorchange)
+			local CO_AdminDet = coroutine.create(AdminDet)
+			coroutine.resume(CO_AdminDet,i,CO_AdminDet)
+		end
+
+	end
+	return Admin
+end
+
+function AdminDet(plr:Player,CO:thread)
+	while true do
+		StarterGui:SetCore("SendNotification",{
+			Title = "       ڷ       ",
+			Text = plr.Name,
+			Icon = "https://www.roblox.com/headshot-thumbnail/image?userId="..plr.UserId.."&width=420&height=420&format=png",
+			Duration = 35,
+		})
+
+		local connection 
+		connection = Players.PlayerRemoving:Connect(function(leavingPlayer)
+			if leavingPlayer == plr then
+				coroutine.close(CO) 
+				AdminLeft(plr)
+				connection:Disconnect() 
+			end
+		end)
+
+		task.wait(180)
+	end
+end
+
+function AdminLeft(plr:Player)
+	StarterGui:SetCore("SendNotification",{
+		Title = "       뿪",
+		Text = plr.Name,
+		Icon = "https://www.roblox.com/headshot-thumbnail/image?userId="..plr.UserId.."&width=420&height=420&format=png",
+		Duration = 35
+	})
+end
+
+Players.PlayerAdded:Connect(function(plr: Player)
+	local plrs = {}
+	table.insert(plrs,plr)
+	ScanTarget(plrs,"     Ѽ  룡    ","  ץ    ")	
+end)
+
+
+if not ScanTarget(game.Players:GetChildren(),"     Ѿ  ڷ        ˣ "," is wating to catch u") then
+	StarterGui:SetCore("SendNotification",{
+		Title = " ѳɹ ɨ  ",
+		Text = "      Ŀǰ ޹   ",
+		Duration = 5
+	})
+end
+
+task.wait(2)
+game.StarterGui:SetCore("SendNotification",{
+	Title = " ѳɹ װ  '      ֮͵Ǯ2003'",
+	Text = "Script by @BHIF   CTRL    ",
+	Duration = 8
+})
