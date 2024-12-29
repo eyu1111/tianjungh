@@ -97,7 +97,7 @@ UserInputSerevice.InputBegan:Connect(function(input: InputObject, gameProcessedE
 			
 			game.StarterGui:SetCore("SendNotification",{
 				Title = "     ÿ   ͵Ǯ",
-				Text = "Script by @BHIF",
+				Text = "Script by @yuyuyu宇",
 				Duration = 2
 			})
 		end
